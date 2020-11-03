@@ -1,4 +1,17 @@
+<#
+.SYNOPSIS
+Parses some directory looking for file change times and 'bad' suffixes
 
+.EXAMPLE
+Get-FilesAndCheckForEncryptionOrAge.ps1 -opMode filterEncrypted -includeDirs "temp"
+
+
+#>
+
+###############################################
+# Copywrite 2020 Paragon Development Systems
+# Written by Adam Warner
+###############################################
 
 [CmdletBinding()]
 param (
@@ -50,6 +63,13 @@ $outDataPath = "$outDir" + "$outDataName"
 
 
 ### Main 'loop'
+
+# Checking output directory
+if ( (Test-Path $outDir) -ne $true ){
+    Write-Error "Desired output directory `"$outDir`" is invalid, verify `$outDir parameter and try again"
+    Exit
+}
+
 # Checking opMode param for validity
 if (( $opMode -ne "infected" ) -and ( $opMode -ne "clean" ) -and ( $opMode -ne "filterEncrypted")) {
     Write-Error "Value $opMode for paramemter `$opMode is invalid, use either `"infected`", `"filterEncrypted`", or `"clean`" "
