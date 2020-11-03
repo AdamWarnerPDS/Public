@@ -45,7 +45,7 @@ param (
 
     [Parameter()]
     [string]
-    $outDir = "C:\Temp\"
+    $outDir = '.\'
 
 )
 
@@ -57,7 +57,7 @@ $dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
 $outPrefix = "$hostname" + "_" + "$dateTime"
 # Output filenames
 $outFIleName = "$outPrefix" + "_FilesystemDump.csv"
-$outDataName = "$outPrefix" + "_Data.csv"
+$outDataName = "$outPrefix" + "_" + "$opMode" + "_Data.csv"
 $outPath = "$outDir" + "$outFIleName"
 $outDataPath = "$outDir" + "$outDataName"
 
@@ -161,3 +161,6 @@ if ( $opMode -eq "clean" ) {
         | Select-Object -Property Name,FullPath,Length,CreationTime,LastWriteDateTime,LastWriteDateStamp,LastWriteTimeStamp,Newer `
         | Export-CSV -Path "$outDataPath" -NoTypeInformation   
 }
+
+# Cleanup csv buffer file
+Remove-Item $outPath -Force
