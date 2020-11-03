@@ -17,16 +17,25 @@
 * The Get-ADPrincipalGroupMembership lines in the account processing loop fails if a group name has a slash ( / ) in it such as "Accounting / IS (EL&C)"
 ** This is a known bug in Get-ADPrincipalGroupMembership
 ** Not sure what to do about this one
+** Should only effect the output for listing all groups an account is a member of, we still have the more important privileged groups list
+
+* During the user processing loop, the occasional error "Get-ADUser: Object reference not set to an instance of an object" occurs
+** This may be due to subdomains and searching on individual servers
+** Or, it seems to be due to a backslach ( \ ) present in the DistinguishedName property of a user
 
 
 === Known Issues - Minor ===
 * Script name should be more like Get-PrivilegedADAccounts.ps1, current name too broad
+
 * Needs inline help
+
 * $outdir is picky
+
 * May want to add some sort of authentication mechanism for long term use
+
 * Throws errors on child domains that lack groups like "Schema Admins" and "Infrastructure Admins"
-* During the user processing loop, the occasional error "Get-ADUser: Object reference not set to an instance of an object" occurs
-** This may be due to subdomains and searching on individual servers
+
+
 
 
 # / Issue Tracker #>
@@ -41,6 +50,7 @@ param (
     [string]
     $outDir = '.\',
 
+    # This controls which groups to query and gather users from
     [Parameter()]
     [array]
     $groupsToCheck = @(
@@ -50,7 +60,38 @@ param (
         "Schema Admins",`
         "Server Operators",`
         "Backup Operators"
+    ),
+
+    # This controls all properties that are logged and output, in general, it's wise to stick to human readable properties
+    # To get possible options, use "Get-ADUser <someSamAccountName> -Properties * | FL"
+    # All values must be exactly correct
+    [Parameter()]
+    [array]
+    $userProperties = @(
+        "SamAccountName"`
+        ,"DisplayName"
+        ,"GivenName"`
+        ,"SurName"`
+        ,"CanonicalName"`
+        ,"DistinguishedName"`
+        ,"mail"`
+        ,"Description"`
+        ,"LockedOut"`
+        ,"Enabled"`
+        ,"PasswordNotRequired"`
+        ,"PasswordNeverExpires"`
+        ,"AccountExpirationDate"`
+        ,"whenCreated"`
+        ,"WhenChanged"`
+        ,"PasswordLastSet"`
+        ,"LastLogonDate"`
     )
+    # These were pulled from $userProperties as they may not be useful
+    <#
+        ,"userAccountControl"`
+        ,"DoesNotRequirePreAuth"
+        ,"accountExpires"`
+    #>
 )
 
 # Safety nulls
@@ -60,23 +101,12 @@ $pdcEmulator = ""
 # Dont change these
 $pdcEmulator = (Get-ADDomain "$domain").PDCEmulator
 $dnsRoot = (Get-ADDomain "$domain").DNSRoot
-$dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
+
 # Output filenames
+$dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
 $outDataName = "$dateTime" + "_" + "$dnsRoot" + "_PrivilegedADUsers.csv"
 $outPath = "$outDir" + "$outFileName"
 $outDataPath = "$outDir" + "$outDataName"
-
-
-<#    MOVED TO PARAMS, NOT SURE IT WILL WORK
-$groupsToCheck = @(
-    "Domain Admins",`
-    "Administrators",`
-    "Enterprise Admins",`
-    "Schema Admins",`
-    "Server Operators",`
-    "Backup Operators"
-)
-#>
 
 # pre-null
 $adminListRaw = @()
@@ -93,6 +123,7 @@ foreach ( $g in $groupsToCheck ) {
     $adminListRaw = $adminListRaw + $members
 
     # Making a quick to process list of each groups members for determining individual priv group membership later
+    # Removing whitespace to make valid dynamic variable names
     $gName = ($g -replace '\s','')
     $adminGroups = $adminGroups + $gName
     New-Variable -Name "$gName" -Value @() -Force
@@ -105,34 +136,9 @@ foreach ( $g in $groupsToCheck ) {
 # Scrub raw of duplicates
 $adminList = $adminListRaw | Select-Object -Unique
 
-# This controlls all properties that are logged
-$userProperties = @(
-    "SamAccountName"`
-    ,"DisplayName"
-    ,"GivenName"`
-    ,"SurName"`
-    ,"CanonicalName"`
-    ,"DistinguishedName"`
-    ,"mail"`
-    ,"Description"`
-    ,"LockedOut"`
-    ,"Enabled"`
-    ,"PasswordNotRequired"`
-    ,"PasswordNeverExpires"`
-    ,"AccountExpirationDate"`
-    ,"whenCreated"`
-    ,"WhenChanged"`
-    ,"PasswordLastSet"`
-    ,"LastLogonDate"`
 
-)
 
-# These were pulled from $userProperties as they may not be useful
-<#
-    ,"userAccountControl"`
-    ,"DoesNotRequirePreAuth"
-    ,"accountExpires"`
-#>
+
 
 # Make $userProperties a nice string for the "Process user properties loop below"
 [string]$userPropertiesString = ""
@@ -146,15 +152,18 @@ $i = 0
 foreach ( $a in $adminList ) {
     $i ++
     Write-Progress -Activity "Processing user accounts in $dnsRoot" -CurrentOperation "$a, $i of $($adminList.Length)" -PercentComplete ($i/$adminList.Length*100)
+    Write-Host "Processing $a"
     $adminRaw = $null
     $adminInfo = New-Object PSCustomObject
+    # Needs to use the "-Filter {SamAccountName -eq $a}" parameter to return a null result if user is not found, this assists in processing 
     $adminRaw = (Get-ADUser -Filter {SamAccountName -eq $a} -Properties * -Server $pdcEmulator)
-    # Deals with subdomain issues
+    # Deals with subdomain issues, it 
     if ($adminRaw -ne $null ) {
+        Write-Host "$a located on DC $pdcEmulator" -ForegroundColor Green
         # Get Group Membership for user
         $groups = @()
         $groupsString = ""
-        $groups = Get-ADPrincipalGroupMembership -Identity "$a" -Server $pdcEmulator -| Select-Object SamAccountName
+        $groups = Get-ADPrincipalGroupMembership -Identity "$a" -Server $pdcEmulator | Select-Object SamAccountName
         # Turn group results into a ; separated string
         foreach ( $g in $groups ) {
             $groupsString = $groupsString + "$($g.SamAccountName)" + ";"
@@ -189,6 +198,9 @@ foreach ( $a in $adminList ) {
         $output = $output + $adminInfo
 
     }    
+    Else {
+        Write-Host "$a not found on DC $pdcEmulator" -ForegroundColor Yellow
+    }
 }
 
 Write-Host "Outputting report to $outDataPath"
