@@ -3,18 +3,34 @@
 # Written by: Adam Warner
 ###############################################################################
 
-# Known Issues - Major
-## Processing speed is somewhat slow, but speeding it up would require a massive refactor
-### Too many nested loops, but they do allow this to be flexible
-## The Get-ADPrincipalGroupMembership lines in the account processing loop fails if a group name has a slash ( / ) in it such as "Accounting / IS (EL&C)"
-### This is a known bug in Get-ADPrincipalGroupMembership
 
 
-# Known Issues - Minor
-## Script name should be more like Get-PrivilegedADAccounts.ps1, current name too broad
-## Needs inline help
-## $outdir is picky
-## May want to add some sort of authentication mechanism for long term use
+
+
+<# #### Issue Tracker
+
+=== Known Issues - Major ===
+
+*Processing speed is somewhat slow, but speeding it up would require a massive refactor
+** Too many nested loops, but they do allow this to be flexible
+
+* The Get-ADPrincipalGroupMembership lines in the account processing loop fails if a group name has a slash ( / ) in it such as "Accounting / IS (EL&C)"
+** This is a known bug in Get-ADPrincipalGroupMembership
+** Not sure what to do about this one
+
+
+=== Known Issues - Minor ===
+* Script name should be more like Get-PrivilegedADAccounts.ps1, current name too broad
+* Needs inline help
+* $outdir is picky
+* May want to add some sort of authentication mechanism for long term use
+* Throws errors on child domains that lack groups like "Schema Admins" and "Infrastructure Admins"
+* During the user processing loop, the occasional error "Get-ADUser: Object reference not set to an instance of an object" occurs
+** This may be due to subdomains and searching on individual servers
+
+
+# / Issue Tracker #>
+
 
 param (
     [Parameter(mandatory=$true)]
@@ -23,13 +39,26 @@ param (
     
     [Parameter()]
     [string]
-    $outDir = '.\'
+    $outDir = '.\',
+
+    [Parameter()]
+    [array]
+    $groupsToCheck = @(
+        "Domain Admins",`
+        "Administrators",`
+        "Enterprise Admins",`
+        "Schema Admins",`
+        "Server Operators",`
+        "Backup Operators"
+    )
 )
 
 # Safety nulls
 $dnsRoot = ""
 $pdcEmulator = ""
 
+# Dont change these
+$pdcEmulator = (Get-ADDomain "$domain").PDCEmulator
 $dnsRoot = (Get-ADDomain "$domain").DNSRoot
 $dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
 # Output filenames
@@ -37,8 +66,8 @@ $outDataName = "$dateTime" + "_" + "$dnsRoot" + "_PrivilegedADUsers.csv"
 $outPath = "$outDir" + "$outFileName"
 $outDataPath = "$outDir" + "$outDataName"
 
-$pdcEmulator = (Get-ADDomain "$domain").PDCEmulator
 
+<#    MOVED TO PARAMS, NOT SURE IT WILL WORK
 $groupsToCheck = @(
     "Domain Admins",`
     "Administrators",`
@@ -47,6 +76,7 @@ $groupsToCheck = @(
     "Server Operators",`
     "Backup Operators"
 )
+#>
 
 # pre-null
 $adminListRaw = @()
@@ -70,9 +100,7 @@ foreach ( $g in $groupsToCheck ) {
     (Get-Variable -Name "$gName").Value += $g
     # indexs 2 to infinity of the array are actual members
     (Get-Variable -Name "$gName").Value += $members
-
 }
-
 
 # Scrub raw of duplicates
 $adminList = $adminListRaw | Select-Object -Unique
@@ -106,14 +134,12 @@ $userProperties = @(
     ,"accountExpires"`
 #>
 
-# Make $userProperties a nice string for GetADUser
+# Make $userProperties a nice string for the "Process user properties loop below"
 [string]$userPropertiesString = ""
 foreach ( $p in $userProperties ) {
     $userPropertiesString = $userPropertiesString + '"' + $p + '",'
 }
 $userPropertiesString = $userPropertiesString -replace ".$"
-
-#$ha = Get-ADUser awarner -Properties * | Select-Object -Property $userPropertiesString
 
 $output = @()
 $i = 0
@@ -124,7 +150,7 @@ foreach ( $a in $adminList ) {
     $adminInfo = New-Object PSCustomObject
     $adminRaw = (Get-ADUser -Filter {SamAccountName -eq $a} -Properties * -Server $pdcEmulator)
     # Deals with subdomain issues
-    if ($admin -ne $null ) {
+    if ($adminRaw -ne $null ) {
         # Get Group Membership for user
         $groups = @()
         $groupsString = ""
