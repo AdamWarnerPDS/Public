@@ -1,3 +1,20 @@
+###############################################################################
+# Copywrite 2020 Paragon Development Systems
+# Written by: Adam Warner
+###############################################################################
+
+# Known Issues - Major
+## Processing speed is somewhat slow, but speeding it up would require a massive refactor
+### Too many nested loops, but they do allow this to be flexible
+## The Get-ADPrincipalGroupMembership lines in the account processing loop fails if a group name has a slash ( / ) in it such as "Accounting / IS (EL&C)"
+### This is a known bug in Get-ADPrincipalGroupMembership
+
+
+# Known Issues - Minor
+## Script name should be more like Get-PrivilegedADAccounts.ps1, current name too broad
+## Needs inline help
+## $outdir is picky
+## May want to add some sort of authentication mechanism for long term use
 
 param (
     [Parameter(mandatory=$true)]
@@ -6,14 +23,12 @@ param (
     
     [Parameter()]
     [string]
-    $outDir = "C:\Temp\"
+    $outDir = '.\'
 )
 
 # Safety nulls
 $dnsRoot = ""
 $pdcEmulator = ""
-
-
 
 $dnsRoot = (Get-ADDomain "$domain").DNSRoot
 $dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
@@ -22,13 +37,7 @@ $outDataName = "$dateTime" + "_" + "$dnsRoot" + "_PrivilegedADUsers.csv"
 $outPath = "$outDir" + "$outFileName"
 $outDataPath = "$outDir" + "$outDataName"
 
-
-
 $pdcEmulator = (Get-ADDomain "$domain").PDCEmulator
-
-
-
-
 
 $groupsToCheck = @(
     "Domain Admins",`
@@ -48,7 +57,7 @@ $i = 0
 # Grab all admins
 foreach ( $g in $groupsToCheck ) {
     $i ++
-    Write-Progress -Activity "Checking group membership in $dnsRoot" -CurrentOperation "Processing$g, $i of $($groupsToCheck.Length)" -PercentComplete ($i/$groupsToCheck.Length*100)
+    Write-Progress -Activity "Checking group membership in $dnsRoot" -CurrentOperation "Processing $g, $i of $($groupsToCheck.Length)" -PercentComplete ($i/$groupsToCheck.Length*100)
     $members = @()
     $members = (Get-ADGroupMember -Identity "$g" -Server $pdcEmulator -Recursive).SamAccountName
     $adminListRaw = $adminListRaw + $members
@@ -57,7 +66,9 @@ foreach ( $g in $groupsToCheck ) {
     $gName = ($g -replace '\s','')
     $adminGroups = $adminGroups + $gName
     New-Variable -Name "$gName" -Value @() -Force
+    # index 0  of the array is the unadulterated group name (ie: Domain Admins)
     (Get-Variable -Name "$gName").Value += $g
+    # indexs 2 to infinity of the array are actual members
     (Get-Variable -Name "$gName").Value += $members
 
 }
@@ -108,47 +119,50 @@ $output = @()
 $i = 0
 foreach ( $a in $adminList ) {
     $i ++
-    Write-Progress -Activity "Processing user accounts" -CurrentOperation "$a, $i of $($adminList.Length)" -PercentComplete ($i/$adminList.Length*100)
+    Write-Progress -Activity "Processing user accounts in $dnsRoot" -CurrentOperation "$a, $i of $($adminList.Length)" -PercentComplete ($i/$adminList.Length*100)
+    $adminRaw = $null
     $adminInfo = New-Object PSCustomObject
-    $adminRaw = (Get-ADUser "$a" -Properties * -Server $pdcEmulator)
-
-    # Get Group Membership for user
-    $groups = @()
-    $groupsString = ""
-    $groups = Get-ADPrincipalGroupMembership -Identity "$a" -Server $pdcEmulator| Select-Object SamAccountName
-    # Turn group results into a ; separated string
-    foreach ( $g in $groups ) {
-        $groupsString = $groupsString + "$($g.SamAccountName)" + ";"
-    }
-    # Removes final ;
-    $groupsString = $groupsString -replace ".$"
-
-    # Break out privileged groups
-    $userAdminGroups = @()
-    foreach ( $g in $adminGroups ) {
-        if ("$a" -in $(Get-Variable $g).Value ){
-            $userAdminGroups = $userAdminGroups + $(Get-Variable -Name "$g").Value[0]
-            Write-Host "$a in $($(Get-Variable -Name "$g").Value[0])"
+    $adminRaw = (Get-ADUser -Filter {SamAccountName -eq $a} -Properties * -Server $pdcEmulator)
+    # Deals with subdomain issues
+    if ($admin -ne $null ) {
+        # Get Group Membership for user
+        $groups = @()
+        $groupsString = ""
+        $groups = Get-ADPrincipalGroupMembership -Identity "$a" -Server $pdcEmulator -| Select-Object SamAccountName
+        # Turn group results into a ; separated string
+        foreach ( $g in $groups ) {
+            $groupsString = $groupsString + "$($g.SamAccountName)" + ";"
         }
-    }
-    $adminGroupsString = ""
-    # Transform to string
-    foreach ($a in $userAdminGroups) {
-        $adminGroupsString = $adminGroupsString + "$a" + ";"
-    }
-    # Remove final ;
-    $adminGroupsString = $adminGroupsString -replace ".$"
-    #>
+        # Removes final ;
+        $groupsString = $groupsString -replace ".$"
 
-    # Process user properties, uses the $userProperties from declarations to determine what fields to add.  This is dynamic, edit $userProperties to add or remove items
-    foreach ( $p in $userProperties ){
-        $adminInfo | Add-Member -MemberType NoteProperty -Name "$p" -Value $adminRaw."$p" -Force
-    }
-    $adminInfo | Add-Member -MemberType NoteProperty -Name "Groups" -Value "$groupsString" -Force
-    $adminInfo | Add-Member -MemberType NoteProperty -Name "PriviledgedGroups" -Value "$adminGroupsString"
+        # Break out privileged groups
+        $userAdminGroups = @()
+        foreach ( $g in $adminGroups ) {
+            if ("$a" -in $(Get-Variable $g).Value ){
+                # uses idex 0 of the array for unadulterated group name
+                $userAdminGroups = $userAdminGroups + $(Get-Variable -Name "$g").Value[0]
+                Write-Host "$a in $($(Get-Variable -Name "$g").Value[0])"
+            }
+        }
+        $adminGroupsString = ""
+        # Transform to string
+        foreach ($a in $userAdminGroups) {
+            $adminGroupsString = $adminGroupsString + "$a" + ";"
+        }
+        # Remove final ;
+        $adminGroupsString = $adminGroupsString -replace ".$"
 
-    $output = $output + $adminInfo
+        # Process user properties, uses the $userProperties from declarations to determine what fields to add.  This is dynamic, edit $userProperties to add or remove items
+        foreach ( $p in $userProperties ){
+            $adminInfo | Add-Member -MemberType NoteProperty -Name "$p" -Value $adminRaw."$p" -Force
+        }
+        $adminInfo | Add-Member -MemberType NoteProperty -Name "Groups" -Value "$groupsString" -Force
+        $adminInfo | Add-Member -MemberType NoteProperty -Name "PriviledgedGroups" -Value "$adminGroupsString"
 
+        $output = $output + $adminInfo
+
+    }    
 }
 
 Write-Host "Outputting report to $outDataPath"
