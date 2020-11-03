@@ -75,6 +75,7 @@ param (
         ,"SurName"`
         ,"CanonicalName"`
         ,"DistinguishedName"`
+        ,"UserPrincipalName"
         ,"mail"`
         ,"Description"`
         ,"LockedOut"`
@@ -137,10 +138,6 @@ foreach ( $g in $groupsToCheck ) {
 # Scrub raw of duplicates
 $adminList = $adminListRaw | Select-Object -Unique
 
-
-
-
-
 # Make $userProperties a nice string for the "Process user properties loop below"
 [string]$userPropertiesString = ""
 foreach ( $p in $userProperties ) {
@@ -156,9 +153,9 @@ foreach ( $a in $adminList ) {
     Write-Host "Processing $a"
     $adminRaw = $null
     $adminInfo = New-Object PSCustomObject
-    # Needs to use the "-Filter {SamAccountName -eq $a}" parameter to return a null result if user is not found, this assists in processing 
+    # Needs to use the "-Filter {SamAccountName -eq $a}" parameter to return a null result if user is not found, this assists in processing subdomains where an account may not be on the current target server
     $adminRaw = (Get-ADUser -Filter {SamAccountName -eq $a} -Properties * -Server $pdcEmulator)
-    # Deals with subdomain issues, it 
+    # Deals with subdomain issues, it ignores null values and keeps returned in $adminRaw, which are the result of a SamAccountName not being present on the target server
     if ($adminRaw -ne $null ) {
         Write-Host "$a located on DC $pdcEmulator" -ForegroundColor Green
         # Get Group Membership for user
