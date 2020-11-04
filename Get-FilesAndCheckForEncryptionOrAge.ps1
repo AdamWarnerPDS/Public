@@ -85,7 +85,7 @@ $outPath = "$outDir" + "$outFIleName"
 $outDataPath = "$outDir" + "$outDataName"
 
 # Convert date comparison to datetime
-$newerThresholdDateTime = [Datetime]::ParseExact($newerThreshold, 'MM/dd/yyyy hh:mm:ss', $null)
+$newerThresholdDateTime = (Get-Date $newerThreshold)
 
 ### Main 'loop'
 
@@ -156,8 +156,8 @@ foreach ( $i in $checksMembersIndex ) {
     } 
     # Check write time. This parses strings so may not be perfectly accurate as it's based on string comparison
     $dateObject = @()
-    $dateObject = [Datetime]::ParseExact($checks[$i].LastWriteTime, 'MM/dd/yyyy hh:mm:ss', $null)
-    If ( $checks[$i].LastWriteTime -gt "$newerThreshold" ) {
+    $dateObject = (Get-Date $checks[$i].LastWriteTime)
+    If ( $checks[$i].LastWriteTime -gt $newerThresholdDateTime ) {
         $checks[$i].Newer = $true
     }
     Else {
