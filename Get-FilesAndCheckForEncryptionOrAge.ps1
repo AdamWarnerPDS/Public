@@ -66,7 +66,7 @@ param (
         '*.ppt*','*.pot*','*.pps*','*.pptx*','*.pptm*','*.potm*','*.ppsx*','*.sldx*','*.sldm*',
         '*.accdb*','*.accde*','*.accdt*','*.accdr*',
         '*.one*',
-        '*.xps*','*.pdf*','*.txt*','*.html*','*.htm*','*.md*'
+        '*.xps*','*.pdf*','*.txt*','*.html*','*.htm*','*.md*','*.csv*'
         '*.apng*','*.gif*','*.jpg*','*.jpeg*','*.jfif*','*.pjpeg*','*.pjp*','*.png*','*.svg*','*.webp*','*.bmp*','*.ico*','*.cur*','*.tiff*','*.raw*'
         '*.avif*','*.webm*','*.mpg*','*.mp2','*.mpeg*','*.mpe*','*.mpv*','*.ogg*','*.mp4*','*.m4p*','*.m4v*','*.avi*','*.mov*','*.qt*','*.flv*','*.swf*','*.avchd*'
         )
@@ -84,6 +84,8 @@ $outDataName = "$outPrefix" + "_" + "$opMode" + "_Data.csv"
 $outPath = "$outDir" + "$outFIleName"
 $outDataPath = "$outDir" + "$outDataName"
 
+# Convert date comparison to datetime
+$newerThresholdDateTime = [Datetime]::ParseExact($newerThreshold, 'MM/dd/yyyy hh:mm:ss', $null)
 
 ### Main 'loop'
 
@@ -153,6 +155,8 @@ foreach ( $i in $checksMembersIndex ) {
         $checks[$i].Encrypted = $false 
     } 
     # Check write time. This parses strings so may not be perfectly accurate as it's based on string comparison
+    $dateObject = @()
+    $dateObject = [Datetime]::ParseExact($checks[$i].LastWriteTime, 'MM/dd/yyyy hh:mm:ss', $null)
     If ( $checks[$i].LastWriteTime -gt "$newerThreshold" ) {
         $checks[$i].Newer = $true
     }
@@ -191,3 +195,4 @@ if ( $opMode -eq "clean" ) {
 
 # Cleanup csv buffer file
 Remove-Item $outPath -Force
+
