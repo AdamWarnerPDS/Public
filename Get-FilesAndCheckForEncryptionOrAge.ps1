@@ -25,7 +25,7 @@ param (
 
     [Parameter()]
     [string]
-    $dirMode = "include",
+    $dirMode = "exclude",
 
     [Parameter()]
     [array]
@@ -33,20 +33,43 @@ param (
 
     [Parameter()]
     [array]
-    $excludeDirs = @("Windows","Program FIles (x86)","Program Files"),
+    $excludeDirs = @("Windows","Program FIles (x86)","Program Files","ProgramData"),
 
     [Parameter()]
     [string]
     $newerThreshold = "2020-10-19 00:00:00",
 
+    # Needs asterisk
     [Parameter()]
     [string]
     $badSuffix = "*.3ncrypt3d",
 
+    # Needs single quotes
     [Parameter()]
     [string]
-    $outDir = '.\'
+    $outDir = '.\',
 
+    # may be nicer as a switch or boolean value
+    [Parameter()]
+    [string]
+    $trimExtensions = "true",
+
+    # Must be single quotes, doublequotes do not work with the -include parameter of gci
+    # Wrapping in asterisks ( * ) allows for detection of encrypted versions
+    # Each line is roughly by file classification (MS Word document, MS Excel document, Image, etc.) for easier tuning
+    # More file types = more files = longer processing time, but larger catch
+    [Parameter()]
+    [array]
+    $trimExtensionsList = @(
+        '*.doc*','*.docx*','*.wbk*','*.dot*','*.docm*','*.dotx*','*.dotm*','*.docb*',
+        '*.xls*','*.xlt*','*.xlm*','*.xlsx*','*.xlsm*','*.xlxt*','*.xltm*','*.xlsb*','*.xla*','*.xlam*','*.xlw*',
+        '*.ppt*','*.pot*','*.pps*','*.pptx*','*.pptm*','*.potm*','*.ppsx*','*.sldx*','*.sldm*',
+        '*.accdb*','*.accde*','*.accdt*','*.accdr*',
+        '*.one*',
+        '*.xps*','*.pdf*','*.txt*','*.html*','*.htm*','*.md*'
+        '*.apng*','*.gif*','*.jpg*','*.jpeg*','*.jfif*','*.pjpeg*','*.pjp*','*.png*','*.svg*','*.webp*','*.bmp*','*.ico*','*.cur*','*.tiff*','*.raw*'
+        '*.avif*','*.webm*','*.mpg*','*.mp2','*.mpeg*','*.mpe*','*.mpv*','*.ogg*','*.mp4*','*.m4p*','*.m4v*','*.avi*','*.mov*','*.qt*','*.flv*','*.swf*','*.avchd*'
+        )
 )
 
 ### Declarations
@@ -91,12 +114,16 @@ else {
     Exit 1
 }
 
+# Extension trim switch logic
+if ($trimExtensions -eq "false") {
+    $trimExtensionsList = '*'
+}
 
 # Gathering filenames and other metadata from found directories, then dumping to csv at $outPath
 # Using 2 stages with a file buffer to try to keep memory down
 ForEach ( $t in $trimDirs ) {
     Write-Progress -Activity "Collecting file information from $driveRoot$t"
-    Get-ChildItem -Path "$driveRoot$t" -File -Recurse -ErrorAction SilentlyContinue `
+    Get-ChildItem -Path "$driveRoot$t" -File -Include $trimExtensionsList -Recurse -ErrorAction SilentlyContinue `
     | Select-Object -Property Name,Length,CreationTime,LastWriteTime,LastAccessTime,{$_.VersionInfo.FileName},{$_.LastWriteTime.Date} `
     | Export-CSV -Path $outPath -Append 
     Write-Progress -Activity "Checking $driveRoot$t" -Completed
