@@ -37,7 +37,7 @@ param (
 
     [Parameter()]
     [string]
-    $newerThreshold = "2020-10-19 00:00:00",
+    $newerThreshold = "10/19/2020 12:00:00 AM",
 
     # Needs asterisk
     [Parameter()]
