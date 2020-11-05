@@ -42,7 +42,11 @@ param (
     # Needs asterisk
     [Parameter()]
     [string]
-    $badSuffix = "*.3ncrypt3d",
+    $badSuffix = "*.3ncrypt3d*",
+
+    [Parameter()]
+    [string]
+    $ignoreSuffix = "*_help",
 
     # Needs single quotes
     [Parameter()]
@@ -147,30 +151,34 @@ $checksMembersIndex = @(0..$checks.Length)
 # Checking for suffix, comparing LastWriteTime, and prettying output
 foreach ( $i in $checksMembersIndex ) {
     Write-Progress -Activity "Processing item $i of $($checks.Length)" -PercentComplete ($i/$checks.Length*100)
-    # Look for the encryption suffix
-    if ( $checks[$i].Name -like "$badSuffix" ) { 
-        $checks[$i].Encrypted = $true 
-    } 
-    Else { 
-        $checks[$i].Encrypted = $false 
-    } 
-    # Check write time. This parses strings so may not be perfectly accurate as it's based on string comparison
-    $dateObject = @()
-    $dateObject = (Get-Date $checks[$i].LastWriteTime)
-    If ( $checks[$i].LastWriteTime -gt $newerThresholdDateTime ) {
-        $checks[$i].Newer = $true
-    }
-    Else {
-        $checks[$i].Newer = $false
-    }
+    # Ignore the "help" files
+    if ( $checks[$i].Name -notlike $ignoreSuffix) {
 
-    # Split LastWriteTime into date and time as these will be more usable in Excel
-    $checks[$i].LastWriteDateStamp = ( $(($checks[$i]).LastWriteTime) -split " " )[0]
-    $checks[$i].LastWriteTimeStamp = ( $(($checks[$i]).LastWriteTime) -split " " )[1]
+        # Look for the encryption suffix
+        if ( $checks[$i].Name -like "$badSuffix" ) { 
+            $checks[$i].Encrypted = $true 
+        } 
+        Else { 
+            $checks[$i].Encrypted = $false 
+        } 
+        # Check write time. This parses strings so may not be perfectly accurate as it's based on string comparison
+        $dateObject = @()
+        $dateObject = (Get-Date $checks[$i].LastWriteTime)
+        If ( $checks[$i].LastWriteTime -gt $newerThresholdDateTime ) {
+            $checks[$i].Newer = $true
+        }
+        Else {
+            $checks[$i].Newer = $false
+        }
 
-    # Prettying up output
-    $checks[$i].FullPath = ($checks[$i].'$_.VersionInfo.FileName')
-    $checks[$i].LastWriteDateTime = $($checks[$i]).LastWriteTime
+        # Split LastWriteTime into date and time as these will be more usable in Excel
+        $checks[$i].LastWriteDateStamp = ( $(($checks[$i]).LastWriteTime) -split " " )[0]
+        $checks[$i].LastWriteTimeStamp = ( $(($checks[$i]).LastWriteTime) -split " " )[1]
+
+        # Prettying up output
+        $checks[$i].FullPath = ($checks[$i].'$_.VersionInfo.FileName')
+        $checks[$i].LastWriteDateTime = $($checks[$i]).LastWriteTime
+    }
 }
 
 # Final Output to $outDataPath
