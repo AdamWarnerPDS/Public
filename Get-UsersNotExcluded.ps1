@@ -4,10 +4,18 @@ $dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
 $outPath = '.\'
 $outName = "ExcludedUsers_$dateTime.csv"
 
+$domain = "ampkcorp.com"
+
+# Safety nulls
+$dnsRoot = ""
+$pdcEmulator = ""
+
+# Dont change these
+$pdcEmulator = (Get-ADDomain "$domain").PDCEmulator
+$dnsRoot = (Get-ADDomain "$domain").DNSRoot
 
 
-
-$adusers = (Get-ADUser -Filter * -Properties SamAccountName,UserPrincipalName)
+$adusers = (Get-ADUser -Filter * -Properties SamAccountName,UserPrincipalName -Server $pdcEmulator)
 $exclusions = Import-CSV -Path "$exclusionsPath"
 $includedUsers = @()
 
