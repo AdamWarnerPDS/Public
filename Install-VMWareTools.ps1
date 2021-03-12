@@ -160,10 +160,6 @@ function Get-Installer {
             Write-InlineLog "Detected $osBit bit OS, fetching $osBit bit installer from $localInstallerFolderPath/$fileName to $fullInstallerPath"
             Copy-Item -Path "$localInstallerFolderPath\$fileName" -Destination "$fullInstallerPath"
         }
-
-    }
-    ElseIf  ( $localInstallerFolderPath -eq "" ) {
-        Write-InlineLog 'localInstallerFolder parameter is empty, skipping local download attempt'
     }
     # Test and use 'remote' path if 'local' fails
     ElseIf ( $($(invoke-webrequest "$remoteInstallerFolderPath" -UseBasicParsing).StatusCode) -eq 200 ) {
@@ -259,10 +255,7 @@ function Verify-VMWareToolsInstallationStatus {
     }
     # Dump installer log to output if it appears failed
     else {
-        Write-InlineLog "@
-            VMware Tools installation appears to have failed
-            Begining output of installer log at $installerLogPath
-            @"
+        Write-InlineLog "VMware Tools installation appears to have failed, begining output of installer log at $installerLogPath
         Write-Host '####################'
         $script:installerLog
         Write-Host '####################'
@@ -299,14 +292,16 @@ Compare-VMWareToolsVersion
 # Can this be cleaned up?
 if ( $execMode -eq "InstallNoClobber" ) {
     if ( $script:newerVMWareToolsVersionInstalled -eq $False -or $script:newerVMWareToolsVersionInstalled -eq $null ) {
+        Write-InlineLog "Installed version is older than installer version, installing"
         Start-Install
     }
     ElseIf ( $script:newerVMWareToolsVersionInstalled -eq $True ) {
         Write-InlineLog "Newer version of VMwareTools already installed and -execMode is set to not clobber, exiting"
     }
 }
-ElseIf ( $execMode -eq "InstallNoClobber" ) {
+ElseIf ( $execMode -eq "InstallClobber" ) {
     If ( $script:newerVMWareToolsVersionInstalled -eq $False -or $script:newerVMWareToolsVersionInstalled -eq $null ) {
+        Write-InlineLog "Installed version is older than installer version, installing"
         Start-Install
     }
     ElseIf ( $script:newerVMWareToolsVersionInstalled -eq $True ) {
