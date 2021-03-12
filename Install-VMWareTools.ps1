@@ -101,8 +101,6 @@ $scriptLogPath = "$workingPath\$startDateTime" + "_$env:COMPUTERNAME" +  "_Vmwar
 # turn $excludeModules into a nice string, don't edit
 $excludedModulesString = $($excludeModules -join ',')
 
-
-
 # Function Declarations
 
 function Exit-Script0 {
@@ -123,7 +121,8 @@ function Write-InlineLog($writeText){
     Write-Host "$(get-date -uf %Y-%m-%dT%H:%M:%S%Z);$env:COMPUTERNAME;$writeText"
 }
 
-function New-InstallPath {
+# Make new working path if it does not already exist
+function New-WorkingPath {
     if ( $(Test-Path -Path "$workingPath") -eq $false ) {
         Write-InlineLog "Creating $workingPath"
         New-Item -Path "$workingPath" -ItemType Directory
@@ -212,7 +211,8 @@ function Compare-VMWareToolsVersion {
             Write-InlineLog "Detected VMWareTools, installed version is $niceInstalledVersion"
             $installerVersion =  (Get-Item "$fullInstallerPath").VersionInfo.ProductVersion
             Write-InlineLog "Downloaded installer is version $installerVersion"
-            If ( $niceInstalledVersion -ge $installerVersion ) {
+            # Casting [version] type so PS does not get things backwards
+            If ( [version]$niceInstalledVersion -ge [version]$installerVersion ) {
                 Write-InlineLog "Installed version $niceInstalledVersion is equal or newer than downloaded version $installerVersion"
                 $script:newerVMWareToolsVersionInstalled = $True
             }
@@ -289,7 +289,7 @@ function Start-Install {
 # Script logging
 Start-Transcript -Path "$scriptLogPath"
 # Test and create install path if not present
-New-InstallPath
+New-WorkingPath
 # Download installer to local folder
 Get-Installer
 # Check installed version (if present) against new installer
@@ -303,7 +303,6 @@ if ( $execMode -eq "InstallNoClobber" ) {
     }
     ElseIf ( $script:newerVMWareToolsVersionInstalled -eq $True ) {
         Write-InlineLog "Newer version of VMwareTools already installed and -execMode is set to not clobber, exiting"
-        Exit-Script0
     }
 }
 ElseIf ( $execMode -eq "InstallNoClobber" ) {
@@ -318,6 +317,10 @@ ElseIf ( $execMode -eq "InstallNoClobber" ) {
 ElseIf ( $execMode -eq "NoInstall") {
     Write-InlineLog "-execMode set to `"NoInstall`", no installation will be performed"
 
+}
+Else {
+    Write-InlineLog "-execMode not set to valid value, exiting"
+    Exit-Script1
 }
 
 Exit-Script0
