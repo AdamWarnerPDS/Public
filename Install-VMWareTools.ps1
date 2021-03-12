@@ -165,6 +165,23 @@ function Get-Installer {
     }
 }
 
+# Get currently installed version of vmwaretools with following format: MM.m.p.BBBBBBBB (Major.minor.pico.Build) for comparison against installer version info and compare against downloaded installer version.
+function Compare-VMWareToolsVersion {
+    # Note: spaces are escaped in the Invoke-Expression expression as it does not handle spaces well
+    $versionInstalledRaw = Invoke-Expression 'C:\Program` Files\VMware\VMware` Tools\VMwareToolboxCmd.exe -v'
+    #$$versionInstalledRaw = "11.2.5.26209 (build-17337674)"
+    # Make prefix by joining array of string created by splitting $$versionInstalledRaw at space, then items selected by '.', then selecting only the first 3 values (omitting the last one)
+    $currentInstalledVersionPrefix = [string]::Join(".",(($versionInstalledRaw -split " ")[0]).split('.')[0..2])
+    # Get suffix by stripping out non numbers
+    $currentInstalledVersionSuffix = ($versionInstalledRaw -split " ")[1] -replace '[^\d]'
+    # Join them to get a nice version number to compare
+    $niceInstalledVersion = "$currentInstalledVersionPrefix" + "." + "$currentInstalledVersionSuffix"
+    $niceInstalledVersion
+
+
+
+}
+
 function Install-VMWareTools {
     <#
     # Construct installer command, be careful exiting the below!
