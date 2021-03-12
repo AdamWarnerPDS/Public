@@ -9,17 +9,19 @@
     3. Define working folder (where logs and installer go)
     4. Time to wait for insaller to complete
     5. Exclude certain modules from being installed such as Bootcamp and ThinPrint
+    6. Whether or not to clobber an existing installation with equal or newer version number, or to simply not install
 .EXAMPLE
     PS C:\> Install-VMWareTools.ps1
     Installs VMWareTools using default settings
 .EXAMPLE
-    PS C:\Install-VMWareTools.ps1 -localInstallerFolderPath "\\server\folderContainingVMT" -remoteInstallerFolderPath "https://packages.vmware.com/tools/esx/7.0p02/windows" -workingPath "C:\VMTInstall" -installerTimeout 600 -excludeModules "Bootcamp","ThinPrint"
+    PS C:\Install-VMWareTools.ps1 -localInstallerFolderPath "\\server\folderContainingVMT" -remoteInstallerFolderPath "https://packages.vmware.com/tools/esx/7.0p02/windows" -workingPath "C:\VMTInstall" -installerTimeout 600 -excludeModules "Bootcamp","ThinPrint" -execMode "InstallClobber"
     Installs VMWareTools with the following:
     1. Tries to fetch installer from \\server\folderContainingVMT
     2. If it can't get the installer from UNC path, tries to fetch installer from https://packages.vmware.com/tools/esx/7.0p02/windows
     3. Uses C:\VMTInstall as a working directory (installer and logs land here)
     4. Waits 600 seconds (10 minutes) for installer to complete
     5. Excludes the Bootcamp and ThinPrint modules from being installed
+    6. Clobbers any existing installation regardless of its version
 
     Logging should be reasonably verbose for troubleshooting.  Not all error-cases will be caught, but most should throw and exit.  If the installer fails, the script should dump the installer log into the script log.
 .PARAMETER localInstallerFolderPath
@@ -42,6 +44,14 @@
     Type: array (of strings)
     Default: "Bootcamp","Sync","Hgfs","AppDefense","ThinPrint"
     Description: List of modules you wish to exclude from being installed.  You can view the names of vmwaretools modules here: https://docs.vmware.com/en/VMware-vSphere/5.5/com.vmware.vmtools.install.doc/GUID-E45C572D-6448-410F-BFA2-F729F2CDA8AC.html#GUID-E45C572D-6448-410F-BFA2-F729F2CDA8AC
+.Parameter execMode
+    Type: string
+    Default: InstallNoClobber
+    Description: Defines whether to actually perform installation depending on this switch and the (potentially) currently installed version of VMWareTools
+    Options:
+    "InstallNoClobber"      Default, performs installation if the installed version is less than the downloaded installer version
+    "InstallClobber"        Performs installation even if installed version is equal to or newer than the downloaded installer version
+    "NoInstall"             Does not actually install
 .NOTES
     Sources
     * https://docs.vmware.com/en/VMware-vSphere/5.5/com.vmware.vmtools.install.doc/GUID-CD6ED7DD-E2E2-48BC-A6B0-E0BB81E05FA3.html
@@ -75,8 +85,7 @@ param (
         "AppDefense",
         "ThinPrint"
     ),
-    #[string]$execMode = "InstallNoClobber"
-    [string]$execMode = "NoInstall"
+    [string]$execMode = "InstallNoClobber"
 
 )
 
@@ -136,22 +145,26 @@ function Get-Installer {
         Exit-Script1
     }
 
-
     $fileName = ""
     # Determine whether to use local or internet installer paths and download correct installer
     # Test and use 'local' path first
-    If ( $(Test-Path -Path "$localInstallerFolderPath") -eq $true ) {
-        Write-InlineLog "Using local network stored installer from $localInstallerFolderPath"
-        If ( $osBit -eq 32 ) {
-            $fileName = (Get-ChildItem -Path "$localInstallerFolderPath" -Filter "*-i386.exe").Name
+    If ( $localInstallerFolderPath -ne "" ) {
+        If ( $(Test-Path -Path "$localInstallerFolderPath") -eq $true ) {
+            Write-InlineLog "Using local network stored installer from $localInstallerFolderPath"
+            If ( $osBit -eq 32 ) {
+                $fileName = (Get-ChildItem -Path "$localInstallerFolderPath" -Filter "*-i386.exe").Name
+            }
+            ElseIf ( $osBit -eq 64 ) {
+                $fileName = (Get-ChildItem -Path "$localInstallerFolderPath" -Filter "*-x86_64.exe").Name
+            }
+            $script:fullInstallerPath = "$workingPath\$fileName"
+            Write-InlineLog "Detected $osBit bit OS, fetching $osBit bit installer from $localInstallerFolderPath/$fileName to $fullInstallerPath"
+            Copy-Item -Path "$localInstallerFolderPath\$fileName" -Destination "$fullInstallerPath"
         }
-        ElseIf ( $osBit -eq 64 ) {
-            $fileName = (Get-ChildItem -Path "$localInstallerFolderPath" -Filter "*-x86_64.exe").Name
-        }
-        $script:fullInstallerPath = "$workingPath\$fileName"
-        Write-InlineLog "Detected $osBit bit OS, fetching $osBit bit installer from $localInstallerFolderPath/$fileName to $fullInstallerPath"
-        Copy-Item -Path "$localInstallerFolderPath\$fileName" -Destination "$fullInstallerPath"
 
+    }
+    ElseIf  ( $localInstallerFolderPath -eq "" ) {
+        Write-InlineLog 'localInstallerFolder parameter is empty, skipping local download attempt'
     }
     # Test and use 'remote' path if 'local' fails
     ElseIf ( $($(invoke-webrequest "$remoteInstallerFolderPath" -UseBasicParsing).StatusCode) -eq 200 ) {
@@ -195,7 +208,6 @@ function Compare-VMWareToolsVersion {
         # Join them to get a nice version number to compare
         # $niceInstalledVersion = "$currentInstalledVersionPrefix" + "." + "$currentInstalledVersionSuffix"
         $niceInstalledVersion = "$currentInstalledVersionPrefix","$currentInstalledVersionSuffix" -join '.' 
-
         If ( $niceInstalledVersion -ne $null ) {
             Write-InlineLog "Detected VMWareTools, installed version is $niceInstalledVersion"
             $installerVersion =  (Get-Item "$fullInstallerPath").VersionInfo.ProductVersion
@@ -219,17 +231,11 @@ function Compare-VMWareToolsVersion {
         Did "Did not detect VMwareTools installation"
         $script:newerVMWareToolsVersionInstalled = $null
     }
-    
-
-    
-
-
-
 }
 
 function Install-VMWareTools {
     <#
-    # Construct installer command, be careful exiting the below!
+    # Construct installer command, be careful editing the below!
     https://docs.vmware.com/en/VMware-vSphere/5.5/com.vmware.vmtools.install.doc/GUID-CD6ED7DD-E2E2-48BC-A6B0-E0BB81E05FA3.html
     ## Explaination of some switches
     * /s                        Silent installation
