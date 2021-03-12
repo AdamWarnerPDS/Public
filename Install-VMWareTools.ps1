@@ -255,7 +255,7 @@ function Verify-VMWareToolsInstallationStatus {
     }
     # Dump installer log to output if it appears failed
     else {
-        Write-InlineLog "VMware Tools installation appears to have failed, begining output of installer log at $installerLogPath
+        Write-InlineLog "VMware Tools installation appears to have failed, begining output of installer log at $installerLogPath"
         Write-Host '####################'
         $script:installerLog
         Write-Host '####################'
