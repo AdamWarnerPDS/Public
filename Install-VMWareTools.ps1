@@ -74,7 +74,9 @@ param (
         "Hgfs",
         "AppDefense",
         "ThinPrint"
-    )
+    ),
+    #[string]$execMode = "InstallNoClobber"
+    [string]$execMode = "NoInstall"
 
 )
 
@@ -93,6 +95,18 @@ $excludedModulesString = $($excludeModules -join ',')
 
 
 # Function Declarations
+
+function Exit-Script0 {
+    # End Script
+    Stop-Transcript
+    Exit 0
+}
+
+function Exit-Script1 {
+    # End Script
+    Stop-Transcript
+    Exit 1
+}
 
 # allow for time-stamp based output/logging; just makes it easier
 # ISO8601 Extended datetime format
@@ -119,7 +133,7 @@ function Get-Installer {
     Write-InlineLog "Detected $osBit bit OS"
     If ( $osBit -eq 0 ) {
         Write-Error "Could not determine OS bit value, exiting"
-        Exit 1
+        Exit-Script1
     }
 
 
@@ -156,27 +170,58 @@ function Get-Installer {
     }
     Else {
         Write-Error "Cannot locate installer, exiting"
-        Exit 1
+        Exit-Script1
     }
     # Attempts to catch a failed transfer; should replace this with a hash check
     if ( (Test-Path $fullInstallerPath) -eq $False) {
         Write-Error "Installer missing, exiting"
-        Exit 1 
+        Exit-Script1
     }
 }
 
 # Get currently installed version of vmwaretools with following format: MM.m.p.BBBBBBBB (Major.minor.pico.Build) for comparison against installer version info and compare against downloaded installer version.
 function Compare-VMWareToolsVersion {
+    $script:newerVMWareToolsVersionInstalled = $null
+    Write-InlineLog "Checking installed VMWareTools version"
     # Note: spaces are escaped in the Invoke-Expression expression as it does not handle spaces well
-    $versionInstalledRaw = Invoke-Expression 'C:\Program` Files\VMware\VMware` Tools\VMwareToolboxCmd.exe -v'
-    #$$versionInstalledRaw = "11.2.5.26209 (build-17337674)"
-    # Make prefix by joining array of string created by splitting $$versionInstalledRaw at space, then items selected by '.', then selecting only the first 3 values (omitting the last one)
-    $currentInstalledVersionPrefix = [string]::Join(".",(($versionInstalledRaw -split " ")[0]).split('.')[0..2])
-    # Get suffix by stripping out non numbers
-    $currentInstalledVersionSuffix = ($versionInstalledRaw -split " ")[1] -replace '[^\d]'
-    # Join them to get a nice version number to compare
-    $niceInstalledVersion = "$currentInstalledVersionPrefix" + "." + "$currentInstalledVersionSuffix"
-    $niceInstalledVersion
+    #If ($true) { # Testing only!!!!!!!!!!!!!!!!!!!
+    If ( $(Test-Path "C:\Program FIles\VMware\VMware Tools\VMwareToolboxCmd.exe") -eq $true) {  
+        $versionInstalledRaw = Invoke-Expression 'C:\Program` Files\VMware\VMware` Tools\VMwareToolboxCmd.exe -v' -ErrorAction SilentlyContinue
+        #$versionInstalledRaw = "11.2.5.26209 (build-17337674)"
+        # Make prefix by joining array of string created by splitting $$versionInstalledRaw at space, then items selected by '.', then selecting only the first 3 values (omitting the last one)
+        $currentInstalledVersionPrefix = [string]::Join(".",(($versionInstalledRaw -split " ")[0]).split('.')[0..2])
+        # Get suffix by stripping out non numbers
+        $currentInstalledVersionSuffix = ($versionInstalledRaw -split " ")[1] -replace '[^\d]'
+        # Join them to get a nice version number to compare
+        # $niceInstalledVersion = "$currentInstalledVersionPrefix" + "." + "$currentInstalledVersionSuffix"
+        $niceInstalledVersion = "$currentInstalledVersionPrefix","$currentInstalledVersionSuffix" -join '.' 
+
+        If ( $niceInstalledVersion -ne $null ) {
+            Write-InlineLog "Detected VMWareTools, installed version is $niceInstalledVersion"
+            $installerVersion =  (Get-Item "$fullInstallerPath").VersionInfo.ProductVersion
+            Write-InlineLog "Downloaded installer is version $installerVersion"
+            If ( $niceInstalledVersion -ge $installerVersion ) {
+                Write-InlineLog "Installed version $niceInstalledVersion is equal or newer than downloaded version $installerVersion"
+                $script:newerVMWareToolsVersionInstalled = $True
+            }
+            Else {
+                Write-InlineLog "Installed version $niceInstalledVersion is older than downloaded version $installerVersion"
+                $script:newerVMWareToolsVersionInstalled = $False
+            }
+        }
+        Else {
+            Write-InlineLog "Unable to get installed VMware Tools version number, does VMwareToolbxCmd.exe exist?"
+            $script:newerVMWareToolsVersionInstalled = $False
+            Return
+        }
+    }
+    Else {
+        Did "Did not detect VMwareTools installation"
+        $script:newerVMWareToolsVersionInstalled = $null
+    }
+    
+
+    
 
 
 
@@ -217,9 +262,21 @@ function Verify-VMWareToolsInstallationStatus {
         Write-Host '####################'
         Write-InlineLog "End of installer log"
         Write-error "VMware Tools Installation appears to have failed, please review the log"
-        Exit 1
+        Exit-Script1
     }
 }
+
+
+function Start-Install {
+    # Run installation
+    Install-VMWareTools
+    # Wait for installation
+    Start-Sleep -Seconds $installerTimeout
+    # Verify installation, dump installer log if fails
+    Verify-VMWareToolsInstallationStatus
+}
+
+
 
 # Main 'loop'
 
@@ -229,14 +286,35 @@ Start-Transcript -Path "$scriptLogPath"
 New-InstallPath
 # Download installer to local folder
 Get-Installer
-# Run installation
-Install-VMWareTools
-# Wait for installation
-Start-Sleep -Seconds $installerTimeout
-# Verify installation, dump installer log if fails
-Verify-VMWareToolsInstallationStatus
-# End Script
-Stop-Transcript
+# Check installed version (if present) against new installer
+Compare-VMWareToolsVersion
+
+# Install decision logic
+# Can this be cleaned up?
+if ( $execMode -eq "InstallNoClobber" ) {
+    if ( $script:newerVMWareToolsVersionInstalled -eq $False -or $script:newerVMWareToolsVersionInstalled -eq $null ) {
+        Start-Install
+    }
+    ElseIf ( $script:newerVMWareToolsVersionInstalled -eq $True ) {
+        Write-InlineLog "Newer version of VMwareTools already installed and -execMode is set to not clobber, exiting"
+        Exit-Script0
+    }
+}
+ElseIf ( $execMode -eq "InstallNoClobber" ) {
+    If ( $script:newerVMWareToolsVersionInstalled -eq $False -or $script:newerVMWareToolsVersionInstalled -eq $null ) {
+        Start-Install
+    }
+    ElseIf ( $script:newerVMWareToolsVersionInstalled -eq $True ) {
+        Write-InlineLog "Newer version of VMwareTools already installed and -execMode is set to clobber, installing"
+        Start-Install
+    }
+}
+ElseIf ( $execMode -eq "NoInstall") {
+    Write-InlineLog "-execMode set to `"NoInstall`", no installation will be performed"
+
+}
+
+Exit-Script0
 
 
 
