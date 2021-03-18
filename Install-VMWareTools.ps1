@@ -61,6 +61,10 @@
     ### Copywrite 2021 Paragon Development Systems ###
     ### Written by: Adam Warner                    ###
     ##################################################
+
+
+    TODO
+    * Installer download cleanup
 #>
 
 
@@ -104,25 +108,27 @@ $excludedModulesString = $($excludeModules -join ',')
 # Function Declarations
 
 function Exit-Script0 {
-    # End Script
+    # End Script with code 0
     Stop-Transcript
     Exit 0
 }
 
 function Exit-Script1 {
-    # End Script
+    # End Script with code 1
     Stop-Transcript
     Exit 1
 }
 
-# allow for time-stamp based output/logging; just makes it easier
-# ISO8601 Extended datetime format
+
 function Write-InlineLog($writeText){
+    # allow for time-stamp based output/logging; just makes it easier
+    # ISO8601 Extended datetime format
     Write-Host "$(get-date -uf %Y-%m-%dT%H:%M:%S%Z);$env:COMPUTERNAME;$writeText"
 }
 
-# Make new working path if it does not already exist
+
 function New-WorkingPath {
+    # Make new working path if it does not already exist
     if ( $(Test-Path -Path "$workingPath") -eq $false ) {
         Write-InlineLog "Creating $workingPath"
         New-Item -Path "$workingPath" -ItemType Directory
@@ -197,7 +203,9 @@ function Compare-VMWareToolsVersion {
         $versionInstalledRaw = Invoke-Expression 'C:\Program` Files\VMware\VMware` Tools\VMwareToolboxCmd.exe -v' -ErrorAction SilentlyContinue
         #$versionInstalledRaw = "11.2.5.26209 (build-17337674)"
         # Make prefix by joining array of string created by splitting $$versionInstalledRaw at space, then items selected by '.', then selecting only the first 3 values (omitting the last one)
-        $currentInstalledVersionPrefix = [string]::Join(".",(($versionInstalledRaw -split " ")[0]).split('.')[0..2])
+        #$currentInstalledVersionPrefix = [string]::Join(".",(($versionInstalledRaw -split " ")[0]).split('.')[0..2])
+        # This is slightly cleaner
+        $currentInstalledVersionPrefix = (($versionInstalledRaw -split " ")[0]).split('.')[0..2] -join "."
         # Get suffix by stripping out non numbers
         $currentInstalledVersionSuffix = ($versionInstalledRaw -split " ")[1] -replace '[^\d]'
         # Join them to get a nice version number to compare
@@ -224,7 +232,7 @@ function Compare-VMWareToolsVersion {
         }
     }
     Else {
-        Did "Did not detect VMwareTools installation"
+        Write-InlineLog "Did not detect VMwareTools installation"
         $script:newerVMWareToolsVersionInstalled = $null
     }
 }
@@ -234,13 +242,14 @@ function Install-VMWareTools {
     # Construct installer command, be careful editing the below!
     https://docs.vmware.com/en/VMware-vSphere/5.5/com.vmware.vmtools.install.doc/GUID-CD6ED7DD-E2E2-48BC-A6B0-E0BB81E05FA3.html
     ## Explaination of some switches
-    * /s                        Silent installation
-    * /v "list of MSI args"     Execute with MSI arguments in quotes
-    * /qn                       Unsure what this does
-    * REBOOT=R                  Do not force reboot, https://docs.microsoft.com/en-us/windows/win32/msi/reboot
-    * ADDLOCAL=ALL              Install all components
-    * REMOVE=<list-of-stuff>    Remove <list-of-stuff> from the currently "all" list of to-be-installed components
-    * /l <somepath>             Log to this path
+    * /s                            Silent installation
+    * /v "list of MSI args"         Execute with MSI arguments in quotes
+    * /qn                           Unsure what this does
+    * REBOOT=R                      Do not force reboot, https://docs.microsoft.com/en-us/windows/win32/msi/reboot
+    ** Means REBOOT=ReallySuppress  MSI API only reads the first character
+    * ADDLOCAL=ALL                  Install all components
+    * REMOVE=<list-of-stuff>        Remove <list-of-stuff> from the currently "all" list of to-be-installed components
+    * /l <somepath>                 Log to this path
     #>
     $installerCommand = "$script:fullInstallerPath" + ' /s /v" /qn REBOOT=R ADDLOCAL=ALL REMOVE=' + "$excludedModulesString" + '" /l ' + "$installerLogPath"
     Write-InlineLog "Running $installerCommand"
