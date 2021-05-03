@@ -53,9 +53,10 @@ foreach ( $i in $ips ) {
     $outputObject | Add-Member -MemberType NoteProperty -Name "Hostname" -Value "blank" -Force
     $outputObject | Add-Member -MemberType NoteProperty -Name "IP" -Value "blank" -Force
 
-    $outputObject.IP = "$ip"
-    $outputObject.Hostname = $( Get-WmiObject win32_computersystem -ComputerName "$i" | Select-Object Name )
+    $outputObject.IP = "$i"
+    $outputObject.Hostname = $( Get-WmiObject win32_computersystem -ComputerName "$i" | Select-Object Name ).Name
     $export = $export + $outputObject
+    Write-Host "$($outputObject.Hostname) = $($outputObject.IP)"
 }
 
 $export | Export-Csv -path .\HostnameLookup.csv -NoTypeInformation

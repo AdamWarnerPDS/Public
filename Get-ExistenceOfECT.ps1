@@ -25,20 +25,23 @@ $pdcEmulator = ""
 $pdcEmulator = (Get-ADDomain "$domain").PDCEmulator
 $dnsRoot = (Get-ADDomain "$domain").DNSRoot
 
-$computers = (Get-ADComputer -Filter * -Server $pdsEmulator).DNSHostName
+$computers = (Get-ADComputer -Filter * -Server $pdcEmulator).DNSHostName
 
-$output = ()
+$output = @()
+$i = 0
+
 foreach ( $c in $computers ){
+    $i ++ 
+    Write-Progress -Activity "Testing for presence of file on remote computers" -Status "$i of $($computers.count)"
     $outputObject = New-Object psobject
-    $outputObject = Add-Member -MemberType NoteProperty -Name "Computer" -Value "blank" -Force
-    $outputObject = Add-Member -MemberType NoteProperty -Name "Present" -Value "blank" -Force
+    $outputObject | Add-Member -MemberType NoteProperty -Name "Computer" -Value "blank" -Force
+    $outputObject | Add-Member -MemberType NoteProperty -Name "Present" -Value "blank" -Force
     $test = $null
-    $test = (Invoke-Command -ComputerName "$c" -ScriptBlock {
-        Test-Path "C:\AmericanPackingCo.ect" -ErrorAction SilentlyContinue
-        }
+    $test = (Invoke-Command -ComputerName "$c" -ScriptBlock { Test-Path "C:\AmericanPackingCo.ect" }  -ErrorAction SilentlyContinue)
     $outputObject.Computer = "$c"
     if ( $test -eq $true ) {
         $outputObject.Present = "TRUE"
+    }
     elseif ( $test -eq $false ) {
         $outputObject.Present = "FALSE"
     }
@@ -49,3 +52,4 @@ foreach ( $c in $computers ){
 }
 
 $output | Export-CSV -Path "$outPath$outName" -NoTypeInformation
+

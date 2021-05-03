@@ -10,7 +10,7 @@ $exclusionsPath = '.\ExcludedUsers.csv'
 
 $dateTime = (Get-Date -Format yyyyMMdd-HHmmss )
 $outPath = '.\'
-$outName = "NotExcludedUsers_$domain_$dateTime.csv"
+$outName = "NotExcludedUsers_" + "$domain" + "_" + "$dateTime" + ".csv"
 
 
 

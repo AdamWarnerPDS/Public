@@ -138,10 +138,10 @@ function New-WorkingPath {
 function Get-Installer {
     # Determine OS 32/64 bit for correct installer
     $osBit = 0
-    If ( $(gwmi win32_operatingsystem).osarchitecture -eq "64-bit" ) {
+    If ( $(Get-WmiObject win32_operatingsystem).osarchitecture -eq "64-bit" ) {
         $osBit = 64
     }
-    ElseIf ( $(gwmi win32_operatingsystem).osarchitecture -eq "32-bit" ) {
+    ElseIf ( $(Get-WmiObject win32_operatingsystem).osarchitecture -eq "32-bit" ) {
         $osBit = 32
     }
     Write-InlineLog "Detected $osBit bit OS"
@@ -241,19 +241,21 @@ function Install-VMWareTools {
     <#
     # Construct installer command, be careful editing the below!
     https://docs.vmware.com/en/VMware-vSphere/5.5/com.vmware.vmtools.install.doc/GUID-CD6ED7DD-E2E2-48BC-A6B0-E0BB81E05FA3.html
-    ## Explaination of some switches
-    * /s                            Silent installation
-    * /v "list of MSI args"         Execute with MSI arguments in quotes
-    * /qn                           Unsure what this does
-    * REBOOT=R                      Do not force reboot, https://docs.microsoft.com/en-us/windows/win32/msi/reboot
-    ** Means REBOOT=ReallySuppress  MSI API only reads the first character
-    * ADDLOCAL=ALL                  Install all components
-    * REMOVE=<list-of-stuff>        Remove <list-of-stuff> from the currently "all" list of to-be-installed components
-    * /l <somepath>                 Log to this path
+    https://www.advancedinstaller.com/user-guide/msiexec.html
+    ## Switches or other operators      ##Explaination
+    * /s                                Silent installation
+    * /v "list of MSI args see below"   Execute with MSI arguments in quotes
+    * "                                 Begin quotes containing MSI args
+    * /qn                               Set UI level to "no UI"
+    * REBOOT=R                          Do not force reboot, https://docs.microsoft.com/en-us/windows/win32/msi/reboot; Means REBOOT=ReallySuppress; MSI API only reads the first character
+    * ADDLOCAL=ALL                      Install all components
+    * REMOVE=<list-of-stuff>            Remove <list-of-stuff> from the currently "all" list of to-be-installed components
+    * "                                 end quotes containing MSI args
+    * /l <somepath>                     Log to this path
     #>
-    $installerCommand = "$script:fullInstallerPath" + ' /s /v" /qn REBOOT=R ADDLOCAL=ALL REMOVE=' + "$excludedModulesString" + '" /l ' + "$installerLogPath"
+    $installerCommand = "$script:fullInstallerPath" + ' /s /v "/qn REBOOT=R ADDLOCAL=ALL REMOVE=' + "$excludedModulesString" + '" /l ' + "$installerLogPath"
     Write-InlineLog "Running $installerCommand"
-    Invoke-Expression "$installerCommand"
+    #Invoke-Expression "$installerCommand"
 
 }
 
