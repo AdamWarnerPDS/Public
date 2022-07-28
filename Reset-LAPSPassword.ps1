@@ -1,0 +1,1 @@
+Import-Module AdmPwd.PS ; $target = (Read-Host -Prompt "Enter Computer Name") ; $t = "0.5" ; $t = (Read-Host -Prompt "How many minutes from now [$t]") ; $time = $($(Get-Date).AddMinutes($t)) ; Write-Host "Resetting local admin password on $target at $time" ; Reset-AdmPwdPassword -ComputerName "$target" -WhenEffective $time

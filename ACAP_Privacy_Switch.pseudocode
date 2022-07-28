@@ -1,0 +1,87 @@
+# Declarations
+$startState = config.startState.get()
+$button = config.buttonIOport.get()
+$buttonType = config.buttonType.get()
+$latchButtonClosedMode = config.button.latchingClosedMode.get()
+$light = config.lightIO.get()
+$mask = config.maskID.get()
+$currentState = $null
+
+# Functions
+
+Function SetPrivacyOn() {
+	$currentState = “private”
+	stream.privacyMask.enable($mask)
+	audio.microphone.disable()
+	io.light.set(off)
+}
+
+Function SetPrivacyOff() {
+	$currentState = “notPrivate”
+	stream.privacyMask.disable($mask)
+	audio.microphone.enable()
+	io.light.set(on)
+}
+
+Function switchState() {
+	if ( $currentState = “private” ) {
+		SetPrivacyOff
+	}
+	if ( $currentState = “notPrivate” ) {
+		SetPrivacyOn
+	}
+}
+
+Function WaitForMomentaryButton() {
+	io.$button.read()
+	if ( io.$button.state = “closed” {
+		switchState
+	wait.ms(250)
+    }
+}
+
+Function WaitForLatchingButton(){
+    io.$button.read()
+    if ( $latchButtonClosedMode = "private" ) {
+        if ( io.$button.state = "closed" ) {
+            if ( $currentState = "notPrivate")
+                SetPrivacyOn
+        }
+        if ( io.$button.state = "open" ) {
+            if ( $currentState = "private")
+                SetPrivacyOff
+        }
+    }
+    if ( $latchButtonClosedMode = "notPrivate" ) {
+        if ( io.$button.state = "closed" ) {
+            if ( $currentState = "private")
+                SetPrivacyOff
+        }
+        if ( io.$button.state = "open" ) {
+            if ( $currentState = "notPrivate")
+                SetPrivacyOn
+        }
+    }
+}
+
+# Main Loop
+
+if ( $buttonType = "latching" ) {
+    while $true {
+        WaitForLatchingButton
+        wait.ms(250)
+    }
+
+}
+
+if ( $buttonType = "momentary") {
+    if ( $startState = “private” ) {
+    	SetPrivacyOn
+    }
+    if ( $startState = “notPrivate” ) {
+	    SetPrivacyOff
+    }
+    While $true {
+     WaitForButton
+    }
+}

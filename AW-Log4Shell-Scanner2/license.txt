@@ -1,0 +1,18 @@
+We do not guarantee the results of the Log4J detection script.  
+
+THIS DETECTION SCRIPT IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED.
+
+Liability for damages related to this engagement is excluded, no matter on which
+legal grounds claims are based. 
+
+The beta detection script is Arctic Wolf Technology as defined by the applicable
+Solutions Agreement between us, and should be treated accordingly.  
+
+If you would like access to the beta detection script, please send a request to 
+security@arcticwolf.com.  By requesting and installing the beta detection script
+you are confirming your consent to the terms stated above.  By consent and 
+acknowledgement, you also confirm that you are authorized to provide to us 
+consent on behalf of your organization. Following receipt of your consent and
+acknowledgement, Arctic Wolf will provide you with instructions on how to 
+download and install the beta detection script.

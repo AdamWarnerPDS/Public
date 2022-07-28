@@ -1,0 +1,78 @@
+flowchart TD
+    subgraph Startup
+        buttonType{Type of Button?}
+    end
+
+    subgraph Set_Privacy_On
+        direction TB
+        enableMask[Enable Privacy Mask]
+        disableAudio[Disable Audio]
+        lightOff[Turn LED off]
+        enableMask --> disableAudio
+        disableAudio --> lightOff
+        end
+    subgraph Set_Privacy_Off
+        direction TB
+        disableMask[Disable Privacy Mask]
+        enableAudio[Enable Audio]
+        lightOn[Turn LED on]
+        disableMask --> enableAudio
+        enableAudio --> lightOn
+    end
+    
+    subgraph Momentary_Button
+        isCorrectStartupPrivOn{Is the specified startup state Privacy On?}
+        wait[Wait some time]
+        waitForButtonPress{Button Pressed?}
+        currentState{What is Current State?}
+        complete[Complete]
+        isCorrectStartupPrivOn --no--> Set_Privacy_Off
+        isCorrectStartupPrivOn --yes--> Set_Privacy_On
+        wait --> waitForButtonPress
+        waitForButtonPress --no--> wait
+        waitForButtonPress --yes--> currentState
+        currentState --Privacy On--> Set_Privacy_Off
+        currentState --Privacy Off--> Set_Privacy_On
+        Set_Privacy_Off --> complete
+        Set_Privacy_On --> complete
+        complete --> wait
+    end
+    buttonType --Momentary--> Momentary_Button
+    
+    
+    subgraph Latching_Button
+        wait2[Wait some time]
+        buttonState{What is button state?}
+        buttonState2{What is button state?}
+        isDesiredStateClosedPrivate{Is the desired closed state Privacy On?}
+        isDesiredStateClosedNotPrivate{Is the desired closed state Privacy Off?}
+        complete2[Complete]
+        subgraph Set_Privacy_On2
+            direction TB
+            enableMask2[Enable Privacy Mask]
+            disableAudio2[Disable Audio]
+            lightOff2[Turn LED off]
+            enableMask2 --> disableAudio2
+            disableAudio2 --> lightOff2
+        end
+        subgraph Set_Privacy_Off2
+            direction TB
+            disableMask2[Disable Privacy Mask]
+            enableAudio2[Enable Audio]
+            lightOn2[Turn LED on]
+            disableMask2 --> enableAudio2
+            enableAudio2 --> lightOn2
+        end
+    wait2 --> isDesiredStateClosedPrivate
+    isDesiredStateClosedPrivate --yes--> buttonState
+    buttonState --closed--> Set_Privacy_On2
+    buttonState --"open"--> Set_Privacy_Off2
+    isDesiredStateClosedPrivate --no--> isDesiredStateClosedNotPrivate
+    isDesiredStateClosedNotPrivate --yes--> buttonState2
+    buttonState2 --"open"--> Set_Privacy_On2
+    buttonState2 --closed--> Set_Privacy_Off2
+    Set_Privacy_On2 --> complete2
+    Set_Privacy_Off2 --> complete2
+    complete2 --> wait2
+    end
+    buttonType --Latching--> Latching_Button

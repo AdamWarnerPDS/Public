@@ -1,0 +1,1 @@
+cd ~ ; wget "https://raw.githubusercontent.com/AdamWarnerPDS/Public/master/vmsa-2021-0028-kb87081.py" && python ~/vmsa-2021-0028-kb87081.py ; wget "https://raw.githubusercontent.com/AdamWarnerPDS/Public/master/remove_log4j_class.py" && python ~/remove_log4j_class.py

@@ -1,0 +1,1 @@
+Import-Module AdmPwd.PS ; $target = (Read-Host -Prompt "Enter Computer Name") ; Get-AdmPwdPassword -ComputerName "$target" | Select-Object Password,ExpirationTimestamp

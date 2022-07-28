@@ -1,0 +1,1 @@
+c:\temp\everything.exe -uninstall-client-service
