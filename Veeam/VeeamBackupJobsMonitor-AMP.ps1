@@ -14,7 +14,7 @@ $sessionProperties = @(
     "Result",
     "State"
 )
-
+<# Broke see SheduleEnabledTime
 $vbrBackupJobs = Get-VBRJob | Where-Object { `
     ($_.IsBackupCopy -eq $false) `
     -and ($_.IsScheduleEnabled -eq $true) `
@@ -22,6 +22,14 @@ $vbrBackupJobs = Get-VBRJob | Where-Object { `
     -and ($_.IsAgentManagementParentJob -eq $false) `
     -and ($_.IsAgentManagementParentJob -eq $false) `
     }
+#>
+$vbrBackupJobs = Get-VBRJob | Where-Object { `
+    ($_.IsBackupCopy -eq $false) `
+    -and ($_.IsScheduleEnabled -eq $true) `
+    -and ($_.IsAgentManagementParentJob -eq $false) `
+    -and ($_.IsAgentManagementParentJob -eq $false) `
+    }
+
 
 $backupJobsCount = $vbrBackupJobs.count
 $outObjectsTop = @()
